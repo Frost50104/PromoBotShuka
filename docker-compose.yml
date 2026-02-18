@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: uppetit_postgres
+    environment:
+      POSTGRES_USER: uppetit
+      POSTGRES_PASSWORD: uppetit_password
+      POSTGRES_DB: uppetit_promo_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uppetit"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Bot application (uncomment when ready to deploy)
+  # bot:
+  #   build: .
+  #   container_name: uppetit_bot
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./logs:/app/logs
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
