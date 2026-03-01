@@ -1,6 +1,6 @@
 """Add extra_gift_allowed to users
 
-Revision ID: b3c4d5e6f7a8
+Revision ID: ae4fe6f30609
 Revises: a1b2c3d4e5f6
 Create Date: 2026-03-01 00:00:00.000000+00:00
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b3c4d5e6f7a8'
-down_revision: Union[str, None] = 'a1b2c3d4e5f6'
+revision: str = 'ae4fe6f30609'
+down_revision: Union[str, None] = 'e2c5ed1daaab'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
