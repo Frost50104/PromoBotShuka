@@ -22,6 +22,9 @@ class Config:
         "sqlite+aiosqlite:///./promo_bot.db"
     )
 
+    # Channel for subscription check
+    CHANNEL_USERNAME: str = os.getenv("CHANNEL_USERNAME", "@uppetit_info")
+
     # Admin settings
     ADMIN_IDS: List[int] = [
         int(id_.strip())

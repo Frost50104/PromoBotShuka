@@ -20,6 +20,7 @@ class AdminStates(StatesGroup):
     """States for admin operations."""
     waiting_for_admin_id = State()
     waiting_for_codes = State()
+    waiting_for_delete_code = State()
 
 
 async def is_admin(user_id: int, session: AsyncSession) -> bool:
@@ -273,6 +274,112 @@ async def cmd_show_users(message: Message, session: AsyncSession) -> None:
         await message.answer("Ошибка при получении списка пользователей")
 
 
+@router.message(Command("delete_code"))
+async def cmd_delete_code(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    """Start promo code deletion flow (admin only)."""
+    if not await is_admin(message.from_user.id, session):
+        logger.warning("Non-admin tried to use delete_code", telegram_id=message.from_user.id)
+        return
+
+    await state.set_state(AdminStates.waiting_for_delete_code)
+    await message.answer(
+        "🗑 <b>Удаление промокода</b>\n\n"
+        "Отправьте код, который нужно удалить, или /cancel для отмены:",
+        parse_mode="HTML",
+    )
+
+
+@router.message(AdminStates.waiting_for_delete_code)
+async def process_delete_code_input(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    """Handle promo code input for deletion."""
+    if message.text and message.text.strip().lower() == "/cancel":
+        await state.clear()
+        await message.answer("❌ Удаление отменено")
+        return
+
+    raw_code = (message.text or "").strip()
+    if not raw_code:
+        await message.answer("❌ Пустой ввод. Отправьте код или /cancel для отмены.")
+        return
+
+    code = await PromoService.get_code_by_raw(session, raw_code)
+    if not code:
+        await message.answer(
+            f"❌ Код <code>{raw_code}</code> не найден в базе.\n\n"
+            "Попробуйте ещё раз или /cancel для отмены.",
+            parse_mode="HTML",
+        )
+        return
+
+    await state.clear()
+
+    status_label = "✅ доступен" if code.status.value == "available" else "📤 выдан пользователю"
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=f"confirm_delete_code:{code.id}"),
+        InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_delete_code"),
+    ]])
+
+    await message.answer(
+        f"⚠️ <b>Подтвердите удаление:</b>\n\n"
+        f"Код: <code>{code.raw_code}</code>\n"
+        f"Статус: {status_label}\n\n"
+        f"Это действие необратимо.",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+    logger.info(
+        "Admin requested code deletion confirmation",
+        telegram_id=message.from_user.id,
+        raw_code=raw_code,
+        code_id=code.id,
+    )
+
+
+@router.callback_query(F.data.startswith("confirm_delete_code:"))
+async def process_confirm_delete_code(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Execute promo code deletion after confirmation."""
+    if not await is_admin(callback.from_user.id, session):
+        await callback.answer("У вас нет прав для этого действия", show_alert=True)
+        return
+
+    try:
+        code_id = int(callback.data.split(":")[1])
+        code = await PromoService.get_code_by_id(session, code_id)
+
+        if not code:
+            await callback.answer("Код уже удалён или не найден", show_alert=True)
+            await callback.message.edit_reply_markup(reply_markup=None)
+            return
+
+        raw_code = code.raw_code
+        await PromoService.delete_code(session, code)
+
+        await callback.answer("✅ Код удалён")
+        await callback.message.edit_text(
+            f"🗑 Код <code>{raw_code}</code> успешно удалён.",
+            parse_mode="HTML",
+        )
+
+        logger.info(
+            "Promo code deleted by admin",
+            admin_id=callback.from_user.id,
+            raw_code=raw_code,
+            code_id=code_id,
+        )
+
+    except Exception as e:
+        logger.error("Error deleting code", telegram_id=callback.from_user.id, error=str(e))
+        await callback.answer("Ошибка при удалении кода", show_alert=True)
+
+
+@router.callback_query(F.data == "cancel_delete_code")
+async def process_cancel_delete_code(callback: CallbackQuery) -> None:
+    """Cancel code deletion."""
+    await callback.answer()
+    await callback.message.edit_text("❌ Удаление отменено.")
+
+
 @router.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext) -> None:
     """
@@ -406,6 +513,102 @@ async def cmd_delete_admin(message: Message, session: AsyncSession) -> None:
             error=str(e),
         )
         await message.answer("Ошибка при получении списка админов")
+
+
+@router.message(Command("add_another_qr"))
+async def cmd_add_another_qr(message: Message, session: AsyncSession) -> None:
+    """Allow a specific user to receive an additional promo code (admin only)."""
+    if not await is_admin(message.from_user.id, session):
+        logger.warning(
+            "Non-admin tried to use add_another_qr",
+            telegram_id=message.from_user.id,
+        )
+        return
+
+    try:
+        users = await UserService.get_users_with_codes(session)
+
+        if not users:
+            await message.answer("👥 Нет пользователей, получивших подарок")
+            return
+
+        buttons = []
+        for user in users:
+            already_allowed = user.extra_gift_allowed
+            label = user.first_name or user.username or f"ID {user.telegram_id}"
+            if user.username:
+                label += f" (@{user.username})"
+            if already_allowed:
+                label += " ✅"
+            buttons.append([
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"allow_extra:{user.telegram_id}",
+                )
+            ])
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await message.answer(
+            "👤 <b>Выберите пользователя, которому разрешить получить ещё один подарок:</b>\n\n"
+            "✅ — уже имеет разрешение",
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
+
+    except Exception as e:
+        logger.error(
+            "Error in add_another_qr",
+            telegram_id=message.from_user.id,
+            error=str(e),
+        )
+        await message.answer("Ошибка при получении списка пользователей")
+
+
+@router.callback_query(F.data.startswith("allow_extra:"))
+async def process_allow_extra(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Grant extra gift permission to a user."""
+    if not await is_admin(callback.from_user.id, session):
+        await callback.answer("У вас нет прав для этого действия", show_alert=True)
+        return
+
+    try:
+        target_telegram_id = int(callback.data.split(":")[1])
+        user = await UserService.get_user_by_telegram_id(session, target_telegram_id)
+
+        if not user:
+            await callback.answer("Пользователь не найден", show_alert=True)
+            return
+
+        if user.extra_gift_allowed:
+            await callback.answer(
+                "У этого пользователя уже есть разрешение на доп. подарок",
+                show_alert=True,
+            )
+            return
+
+        await UserService.allow_extra_gift(session, user)
+
+        name = user.first_name or user.username or f"ID {user.telegram_id}"
+        await callback.answer(f"✅ {name} может получить ещё один подарок", show_alert=True)
+        await callback.message.edit_text(
+            f"✅ Пользователю <b>{name}</b> (tg_id: <code>{target_telegram_id}</code>) "
+            "разрешено получить ещё один подарок.",
+            parse_mode="HTML",
+        )
+
+        logger.info(
+            "Extra gift granted by admin",
+            admin_id=callback.from_user.id,
+            target_telegram_id=target_telegram_id,
+        )
+
+    except Exception as e:
+        logger.error(
+            "Error granting extra gift",
+            telegram_id=callback.from_user.id,
+            error=str(e),
+        )
+        await callback.answer("Ошибка при выдаче разрешения", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("delete_admin:"))

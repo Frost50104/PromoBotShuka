@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     String,
     DateTime,
     Enum,
@@ -48,6 +49,12 @@ class User(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False
+    )
+    extra_gift_allowed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
         nullable=False
     )
 

@@ -108,6 +108,93 @@ class PromoService:
         return count > 0
 
     @staticmethod
+    async def get_extra_code(
+        session: AsyncSession,
+        user: User,
+    ) -> Optional[PromoCode]:
+        """
+        Get an additional promo code for a user who already has one.
+        Skips the duplicate check. Resets extra_gift_allowed after assigning.
+
+        Args:
+            session: Database session
+            user: User to assign the extra code to
+
+        Returns:
+            PromoCode instance or None if no codes available
+        """
+        result = await session.execute(
+            select(PromoCode)
+            .where(PromoCode.status == CodeStatus.AVAILABLE)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        code = result.scalar_one_or_none()
+
+        if not code:
+            logger.error(
+                "No promo codes available for extra gift",
+                user_id=user.id,
+                telegram_id=user.telegram_id,
+            )
+            return None
+
+        code.status = CodeStatus.ASSIGNED
+        code.assigned_to_user_id = user.id
+        code.assigned_at = datetime.utcnow()
+        user.extra_gift_allowed = False
+
+        await session.commit()
+        await session.refresh(code)
+
+        logger.info(
+            "Extra promo code assigned to user",
+            user_id=user.id,
+            telegram_id=user.telegram_id,
+            code_id=code.id,
+            raw_code=code.raw_code,
+        )
+
+        return code
+
+    @staticmethod
+    async def get_code_by_raw(
+        session: AsyncSession,
+        raw_code: str,
+    ) -> Optional[PromoCode]:
+        """Find a promo code by its raw value."""
+        result = await session.execute(
+            select(PromoCode).where(PromoCode.raw_code == raw_code)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_code_by_id(
+        session: AsyncSession,
+        code_id: int,
+    ) -> Optional[PromoCode]:
+        """Find a promo code by its database ID."""
+        result = await session.execute(
+            select(PromoCode).where(PromoCode.id == code_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def delete_code(
+        session: AsyncSession,
+        code: PromoCode,
+    ) -> None:
+        """Delete a promo code from the database."""
+        await session.delete(code)
+        await session.commit()
+        logger.info(
+            "Promo code deleted",
+            code_id=code.id,
+            raw_code=code.raw_code,
+            status=code.status.value,
+        )
+
+    @staticmethod
     async def add_codes(
         session: AsyncSession,
         codes: list[str],

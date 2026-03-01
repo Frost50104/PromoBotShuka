@@ -6,7 +6,9 @@ Telegram-бот для совместной промо-акции [UPPETIT](http
 
 ## Возможности
 
+- Проверка подписки на канал перед выдачей подарка
 - Выдача уникальных QR-кодов (один раз на пользователя)
+- Повторная выдача подарка по решению администратора
 - Защита от race conditions при параллельных запросах
 - Временные рамки акции
 - Admin-панель для управления и статистики
@@ -37,6 +39,7 @@ DATABASE_URL=sqlite+aiosqlite:///./promo_bot.db
 ADMIN_IDS=your_telegram_id
 PROMO_START=2026-02-05
 PROMO_END=2026-05-30
+CHANNEL_USERNAME=@uppetit_info
 LOG_LEVEL=INFO
 EOF
 ```
@@ -47,9 +50,6 @@ EOF
 ### 3. База данных
 
 ```bash
-# Создать миграцию
-alembic revision --autogenerate -m "Initial migration"
-
 # Применить миграции
 alembic upgrade head
 
@@ -70,16 +70,20 @@ python -m app.main
 ```
 PromoBotShuka/
 ├── app/
-│   ├── handlers/          # Обработчики команд (/start, /my_id, /stats, /new_codes, /show_info, /show_users, /add_admin, /delete_admin, /cancel)
-│   ├── services/          # Бизнес-логика (user, promo, qr, admin)
-│   ├── database/          # SQLAlchemy модели и сессии
-│   ├── middleware/        # DB session middleware
-│   ├── utils/             # Логирование и утилиты
-│   ├── config.py          # Конфигурация из .env
-│   ├── bot.py             # Инициализация бота и dispatcher
-│   └── main.py            # Точка входа
-├── alembic/               # Миграции БД
-├── tools/                 # CLI инструменты (import_codes)
+│   ├── handlers/
+│   │   ├── start.py   # /start, /my_id + callback проверки подписки
+│   │   └── admin.py   # /stats, /show_info, /show_users, /new_codes,
+│   │                  # /add_another_qr, /delete_code,
+│   │                  # /add_admin, /delete_admin, /cancel
+│   ├── services/      # Бизнес-логика (user, promo, qr, admin)
+│   ├── database/      # SQLAlchemy модели и сессии
+│   ├── middleware/    # DB session middleware
+│   ├── utils/         # Логирование и утилиты
+│   ├── config.py      # Конфигурация из .env
+│   ├── bot.py         # Инициализация бота и dispatcher
+│   └── main.py        # Точка входа
+├── alembic/           # Миграции БД
+├── tools/             # CLI инструменты (import_codes)
 └── requirements.txt
 ```
 
@@ -89,7 +93,8 @@ PromoBotShuka/
 
 1. **Получить промокод:**
    - Отправить `/start` боту
-   - Получить приветствие и QR-код с промокодом
+   - Если не подписан на [@uppetit_info](https://t.me/uppetit_info) — бот попросит подписаться и покажет кнопки «Подписаться на канал» и «Я подписался ✅»
+   - После подтверждения подписки — получить приветствие и QR-код с промокодом
    - При повторном запросе: "Вы уже получили подарок"
 
 2. **Узнать свой Telegram ID:**
@@ -98,45 +103,23 @@ PromoBotShuka/
 
 ### Для администраторов
 
-**Детальная информация:**
-```
-/show_info
-```
-Показывает:
-- Количество кодов всего
-- Количество выданных кодов
-- Количество кодов в запасе
-- Количество уникальных пользователей
-
-**Список пользователей (новое):**
-```
-/show_users
-```
-Показывает список всех пользователей бота:
-- Telegram ID
-- Имя
-- Username
-- Дата регистрации
-
 **Статистика промокодов:**
 ```
 /stats
 ```
 Показывает: всего кодов, доступно, выдано.
 
-**Добавить админа:**
+**Детальная информация:**
 ```
-/add_admin
+/show_info
 ```
-Запрашивает Telegram ID нового админа.
-Только текущие админы могут добавлять новых.
+Показывает количество кодов (всего / выдано / в запасе) и количество уникальных пользователей.
 
-**Удалить админа:**
+**Список пользователей:**
 ```
-/delete_admin
+/show_users
 ```
-Показывает inline кнопки с именами админов для удаления.
-Главный админ (ID: 854825784) не может быть удален.
+Показывает список всех пользователей бота: Telegram ID, имя, username, дата регистрации.
 
 **Добавить коды через Telegram:**
 ```
@@ -149,6 +132,30 @@ PromoBotShuka/
 987652691640275
 ```
 Бот покажет сколько кодов добавлено и сколько пропущено (дубликаты).
+
+**Удалить код:**
+```
+/delete_code
+```
+Запрашивает код для удаления. Бот находит его в базе, показывает статус (`доступен` / `выдан пользователю`) и предлагает подтвердить удаление через inline-кнопки. Действие необратимо.
+
+**Разрешить пользователю получить ещё один подарок:**
+```
+/add_another_qr
+```
+Показывает список пользователей, которые уже получили подарок. Нажатие на пользователя выдаёт ему разрешение на получение ещё одного QR-кода. При следующем `/start` бот выдаст новый подарок и автоматически снимет разрешение.
+
+**Добавить админа:**
+```
+/add_admin
+```
+Запрашивает Telegram ID нового админа. Только текущие админы могут добавлять новых.
+
+**Удалить админа:**
+```
+/delete_admin
+```
+Показывает inline-кнопки с именами админов для удаления. Главный админ не может быть удалён.
 
 **CLI импорт (альтернативный способ):**
 ```bash
@@ -198,13 +205,11 @@ cd /opt/bots/uppetit-bot
 # Выполнить на ЛОКАЛЬНОЙ машине:
 # cd /path/to/PromoBotShuka
 # tar czf /tmp/bot.tar.gz --exclude='.venv' --exclude='.git' --exclude='__pycache__' \
-#   app/ alembic/ tools/ requirements.txt alembic.ini docker-compose.yml Dockerfile
+#   app/ alembic/ tools/ requirements.txt alembic.ini
 # scp /tmp/bot.tar.gz root@your-server-ip:/opt/bots/uppetit-bot/
 #
 # Затем на СЕРВЕРЕ распаковать:
-# cd /opt/bots/uppetit-bot
-# tar xzf bot.tar.gz
-# rm bot.tar.gz
+# tar xzf bot.tar.gz && rm bot.tar.gz
 
 # 6. Установить Python зависимости
 python3.12 -m venv .venv
@@ -219,15 +224,15 @@ DATABASE_URL=postgresql+asyncpg://uppetit:secure_password@localhost:5432/uppetit
 ADMIN_IDS=your_telegram_id
 PROMO_START=2026-02-05
 PROMO_END=2026-05-30
+CHANNEL_USERNAME=@uppetit_info
 LOG_LEVEL=INFO
 EOF
 
 # 8. Применить миграции
-alembic revision --autogenerate -m "Initial migration"
 alembic upgrade head
 
 # 9. Импортировать промокоды
-python -m tools.import_codes --test
+python -m tools.import_codes --file codes.txt
 
 # 10. Создать systemd service
 cat > /etc/systemd/system/uppetit-bot.service << 'EOF'
@@ -280,157 +285,16 @@ systemctl stop uppetit-bot
 ### Обновление бота
 
 ```bash
-# Остановить
 systemctl stop uppetit-bot
 
-# Обновить код (git pull или скопировать файлы)
 cd /opt/bots/uppetit-bot
-# git pull  # если используете git
+# Скопировать новые файлы (см. шаг 5 выше)
 
-# Активировать окружение
 source .venv/bin/activate
-
-# Обновить зависимости
 pip install --upgrade -r requirements.txt
-
-# Применить миграции
 alembic upgrade head
 
-# Запустить
 systemctl start uppetit-bot
-```
-
-### Docker деплой (альтернатива)
-
-⚠️ **Примечание:** На некоторых серверах могут быть проблемы с доступом к репозиториям Docker при сборке. В таких случаях используйте systemd (см. выше).
-
-```bash
-# 1. Подключиться к серверу
-ssh root@your-server-ip
-
-# 2. Установить Docker и Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-rm get-docker.sh
-
-# 3. Создать директорию проекта
-mkdir -p /opt/bots/uppetit-bot
-cd /opt/bots/uppetit-bot
-
-# 4. Скопировать файлы проекта (выполнить на локальной машине)
-# cd /path/to/PromoBotShuka
-# tar czf /tmp/bot.tar.gz --exclude='.venv' --exclude='.git' --exclude='__pycache__' \
-#   app/ alembic/ tools/ requirements.txt alembic.ini docker-compose.yml Dockerfile .dockerignore
-# scp /tmp/bot.tar.gz root@your-server-ip:/opt/bots/uppetit-bot/
-#
-# На сервере:
-# cd /opt/bots/uppetit-bot
-# tar xzf bot.tar.gz
-# rm bot.tar.gz
-
-# 5. Создать .env файл
-cat > .env << 'EOF'
-BOT_TOKEN=your_bot_token
-DATABASE_URL=postgresql+asyncpg://uppetit:uppetit_password@postgres:5432/uppetit_promo_bot
-ADMIN_IDS=your_telegram_id
-PROMO_START=2026-02-05
-PROMO_END=2026-05-30
-LOG_LEVEL=INFO
-EOF
-
-# 6. Обновить docker-compose.yml (раскомментировать секцию bot)
-# Убедитесь, что в docker-compose.yml секция bot активна:
-cat > docker-compose.yml << 'EOF'
-version: '3.8'
-
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: uppetit_postgres
-    environment:
-      POSTGRES_USER: uppetit
-      POSTGRES_PASSWORD: uppetit_password
-      POSTGRES_DB: uppetit_promo_bot
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U uppetit"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  bot:
-    build: .
-    container_name: uppetit_bot
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    volumes:
-      - ./logs:/app/logs
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-EOF
-
-# 7. Запустить через Docker Compose
-docker compose up -d --build
-
-# 8. Проверить статус
-docker compose ps
-docker compose logs bot
-
-# 9. Применить миграции (внутри контейнера)
-docker compose exec bot alembic revision --autogenerate -m "Initial migration"
-docker compose exec bot alembic upgrade head
-
-# 10. Импортировать промокоды
-docker compose exec bot python -m tools.import_codes --test
-
-# 11. Проверить логи
-docker compose logs -f bot
-```
-
-**Управление Docker ботом:**
-
-```bash
-# Статус контейнеров
-docker compose ps
-
-# Логи в реальном времени
-docker compose logs -f bot
-
-# Перезапуск
-docker compose restart bot
-
-# Остановка
-docker compose down
-
-# Полная остановка с удалением volumes
-docker compose down -v
-
-# Пересборка после изменений
-docker compose up -d --build
-```
-
-**Обновление Docker бота:**
-
-```bash
-# Остановить
-docker compose down
-
-# Обновить код (скопировать новые файлы)
-
-# Пересобрать и запустить
-docker compose up -d --build
-
-# Применить миграции
-docker compose exec bot alembic upgrade head
 ```
 
 ## Архитектура
@@ -438,15 +302,18 @@ docker compose exec bot alembic upgrade head
 ### Слои приложения
 
 ```
-┌──────────────────────────────┐
-│   Handlers (Telegram)        │  /start, /stats, /add_codes
-├──────────────────────────────┤
-│   Services (Business Logic)  │  user, promo, qr
-├──────────────────────────────┤
-│   Database (SQLAlchemy)      │  models, session
-├──────────────────────────────┤
-│   PostgreSQL                 │
-└──────────────────────────────┘
+┌──────────────────────────────────────────┐
+│   Handlers (Telegram)                    │
+│   start.py  — /start, /my_id            │
+│   admin.py  — управление кодами и БД    │
+├──────────────────────────────────────────┤
+│   Services (Business Logic)              │
+│   user, promo, qr, admin                │
+├──────────────────────────────────────────┤
+│   Database (SQLAlchemy + asyncpg)        │
+├──────────────────────────────────────────┤
+│   PostgreSQL                             │
+└──────────────────────────────────────────┘
 ```
 
 ### Модели данных
@@ -454,6 +321,7 @@ docker compose exec bot alembic upgrade head
 **User:**
 - id, telegram_id (unique), username, first_name, last_name
 - created_at, last_seen_at
+- extra_gift_allowed (bool) — флаг разрешения на повторный подарок
 
 **PromoCode:**
 - id, raw_code (unique), status (AVAILABLE | ASSIGNED)
@@ -496,7 +364,7 @@ systemctl status uppetit-bot
 journalctl -u uppetit-bot -n 50
 
 # Проверить токен
-cat .env | grep BOT_TOKEN
+grep BOT_TOKEN .env
 ```
 
 ### Ошибка "permission denied for schema public"
@@ -509,18 +377,13 @@ ALTER DATABASE uppetit_promo_bot OWNER TO uppetit;
 EOF
 ```
 
-### Ошибка "ImportError: cannot import name 'close_db'"
+### Бот не проверяет подписку / все получают подарок без подписки
 
-Убедитесь, что в `app/database/__init__.py` есть:
-```python
-from .session import async_session_maker, init_db, close_db
+Бот должен быть **администратором** канала `@uppetit_info`. Без этого Telegram API не позволяет проверять статус участников — при ошибке бот пропускает проверку (fail open), чтобы не блокировать пользователей.
 
-__all__ = [
-    "async_session_maker",
-    "init_db",
-    "close_db",
-]
-```
+1. Откройте канал в Telegram → Управление каналом → Администраторы
+2. Добавьте бота как администратора (достаточно минимальных прав)
+3. Убедитесь, что `CHANNEL_USERNAME=@uppetit_info` задан в `.env`
 
 ### "Все подарки разобрали" (но коды есть)
 
@@ -528,22 +391,18 @@ __all__ = [
 # Проверить коды в БД
 sudo -u postgres psql -d uppetit_promo_bot -c "SELECT status, COUNT(*) FROM promo_codes GROUP BY status;"
 
-# Если кодов нет - импортировать
+# Если кодов нет — импортировать
 cd /opt/bots/uppetit-bot
 source .venv/bin/activate
-python -m tools.import_codes --test
+python -m tools.import_codes --file codes.txt
 
-# Перезапустить бота
 systemctl restart uppetit-bot
 ```
 
 ## Миграции
 
 ```bash
-# Создать миграцию
-alembic revision --autogenerate -m "Description"
-
-# Применить
+# Применить все
 alembic upgrade head
 
 # Откатить последнюю
@@ -593,21 +452,6 @@ crontab -e
 0 3 * * * sudo -u postgres pg_dump uppetit_promo_bot > /opt/backups/uppetit-bot/backup_$(date +\%Y\%m\%d_\%H\%M\%S).sql
 0 4 * * * find /opt/backups/uppetit-bot -name "backup_*.sql" -mtime +30 -delete
 ```
-
-## Логирование
-
-Structured logging с контекстом:
-```python
-logger.info(
-    "QR code sent to user",
-    telegram_id=user_telegram_id,
-    user_id=user.id,
-    code_id=promo_code.id,
-    raw_code=promo_code.raw_code,
-)
-```
-
-Все события логируются с метаданными для анализа.
 
 ## Лицензия
 

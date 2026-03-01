@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import User
+from app.database.models import User, PromoCode
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -104,3 +104,30 @@ class UserService:
             select(User).order_by(User.created_at.desc())
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_users_with_codes(
+        session: AsyncSession,
+    ) -> list[User]:
+        """Get users who have already received at least one promo code."""
+        result = await session.execute(
+            select(User)
+            .join(PromoCode, PromoCode.assigned_to_user_id == User.id)
+            .distinct()
+            .order_by(User.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def allow_extra_gift(
+        session: AsyncSession,
+        user: User,
+    ) -> None:
+        """Grant user permission to receive an additional promo code."""
+        user.extra_gift_allowed = True
+        await session.commit()
+        logger.info(
+            "Extra gift allowed for user",
+            user_id=user.id,
+            telegram_id=user.telegram_id,
+        )
