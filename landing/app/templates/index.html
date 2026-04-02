@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Идёт Весна × UPPETIT — Получи подарок{% endblock %}
+
+{% block body %}
+<div class="page">
+  <div class="container">
+
+    <div class="hero-banner">
+      <img src="/static/images/banner.jpeg" alt="Идёт Весна × UPPETIT">
+    </div>
+
+    {% if not promo_active %}
+    <div class="card">
+      <div class="inactive-banner">
+        <div class="emoji">🌸</div>
+        <h2>Акция завершена</h2>
+        <p style="margin-top:12px;color:var(--gray);">
+          Акция проходила до {{ promo_end }}.<br>
+          Следите за нашими новостями!
+        </p>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card">
+      <span class="badge">🎁 Акция до {{ promo_end }}</span>
+      <h2 style="margin-bottom:8px;">Получи дрип-пак кофе<br>в подарок!</h2>
+      <p style="color:var(--gray);font-size:.9rem;margin-bottom:20px;">
+        Заполни форму и получи QR-код для кассы UPPETIT.
+      </p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Заполни форму ниже</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Получи QR-код на экране</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Покажи QR-код на кассе UPPETIT</div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/claim" id="mainForm" novalidate>
+        <div class="form-group">
+          <label for="name">Ваше имя</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            placeholder="Иван"
+            value="{{ name_value or '' }}"
+            required
+            autocomplete="given-name"
+          >
+        </div>
+        <div class="form-group">
+          <label for="phone">Номер телефона</label>
+          <input
+            type="tel"
+            id="phone"
+            name="phone"
+            placeholder="+7 (900) 000-00-00"
+            value="{{ phone_value or '' }}"
+            required
+            autocomplete="tel"
+          >
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="example@mail.ru"
+            value="{{ email_value or '' }}"
+            required
+            autocomplete="email"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          Получить подарок
+        </button>
+        <div class="spinner" id="spinner" style="margin-top:14px;"></div>
+      </form>
+
+      <p style="font-size:.72rem;color:var(--gray);text-align:center;margin-top:16px;line-height:1.5;">
+        Нажимая кнопку, вы соглашаетесь на обработку персональных данных
+        (имя, номер телефона, email) в целях проведения акции
+        в соответствии с&nbsp;Федеральным законом №&nbsp;152-ФЗ
+        «О персональных данных».
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+  const phoneInput = document.getElementById('phone');
+  if (phoneInput) {
+    phoneInput.addEventListener('input', function(e) {
+      let v = e.target.value.replace(/\D/g, '');
+      if (v.startsWith('8')) v = '7' + v.slice(1);
+      if (v.startsWith('7') && v.length > 0) {
+        let f = '+7';
+        if (v.length > 1) f += ' (' + v.slice(1, 4);
+        if (v.length >= 4) f += ') ' + v.slice(4, 7);
+        if (v.length >= 7) f += '-' + v.slice(7, 9);
+        if (v.length >= 9) f += '-' + v.slice(9, 11);
+        e.target.value = f;
+      }
+    });
+  }
+
+  const form = document.getElementById('mainForm');
+  const btn  = document.getElementById('submitBtn');
+  const spin = document.getElementById('spinner');
+  if (form) {
+    form.addEventListener('submit', function() {
+      btn.disabled = true;
+      btn.style.opacity = '.6';
+      spin.style.display = 'block';
+    });
+  }
+</script>
+{% endblock %}

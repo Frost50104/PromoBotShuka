@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vesnaidet
+      POSTGRES_USER: vesnaidet
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vesnaidet_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vesnaidet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://vesnaidet:${DB_PASSWORD:-vesnaidet_secret}@db:5432/vesnaidet
+    ports:
+      - "127.0.0.1:8010:8000"   # Слушаем только localhost, Nginx проксирует
+    volumes:
+      - ./static:/app/static:ro
+
+volumes:
+  postgres_data:

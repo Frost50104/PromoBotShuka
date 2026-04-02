@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Подтверждение номера — Идёт Весна{% endblock %}
+
+{% block body %}
+<div class="page">
+  <div class="container">
+
+    <div class="hero-banner" style="max-height:140px;overflow:hidden;">
+      <img src="/static/images/banner.jpeg" alt="Идёт Весна" style="object-position:top;">
+    </div>
+
+    <div class="card">
+      <a href="/" class="back-link">← Назад</a>
+
+      <h2 style="margin-bottom:8px;">Введи код из SMS</h2>
+      <p style="color:var(--gray);font-size:.9rem;margin-bottom:24px;">
+        Мы отправили 4-значный код на номер<br>
+        <strong>{{ masked_phone }}</strong>
+      </p>
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/verify-otp" id="verifyForm">
+        <input type="hidden" name="pt" value="{{ pt }}">
+        <div class="form-group">
+          <label for="code">Код подтверждения</label>
+          <input
+            class="otp-input"
+            type="text"
+            id="code"
+            name="code"
+            placeholder="0000"
+            maxlength="4"
+            inputmode="numeric"
+            pattern="[0-9]{4}"
+            autocomplete="one-time-code"
+            autofocus
+            required
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="verifyBtn">
+          Подтвердить
+        </button>
+        <div class="spinner" id="spinner" style="margin-top:14px;"></div>
+      </form>
+
+      <hr class="divider">
+
+      <p style="font-size:.85rem;color:var(--gray);text-align:center;">
+        Не получили SMS? Подождите минуту.<br>
+        <a href="/" style="color:var(--black);font-weight:700;">Запросить новый код</a>
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Автосабмит при 4 цифрах
+  const codeInput = document.getElementById('code');
+  const form = document.getElementById('verifyForm');
+  const btn  = document.getElementById('verifyBtn');
+  const spin = document.getElementById('spinner');
+
+  codeInput.addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '').slice(0, 4);
+    if (this.value.length === 4) {
+      btn.disabled = true;
+      btn.style.opacity = '.6';
+      spin.style.display = 'block';
+      form.submit();
+    }
+  });
+
+  form.addEventListener('submit', function() {
+    btn.disabled = true;
+    btn.style.opacity = '.6';
+    spin.style.display = 'block';
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дашборд — Админ-панель</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+
+<nav class="admin-nav">
+  <div class="admin-nav-inner">
+    <span class="admin-nav-logo">UPPETIT Admin</span>
+    <a href="/admin/logout" class="admin-nav-logout">Выйти</a>
+  </div>
+</nav>
+
+<div class="admin-container">
+
+  <!-- Заголовок -->
+  <div class="admin-header">
+    <h1>Дашборд</h1>
+    <p style="color:var(--gray);">Управление акцией «Идёт Весна»</p>
+  </div>
+
+  <!-- Статистика -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Всего кодов</div>
+    </div>
+    <div class="stat-card stat-card--green">
+      <div class="stat-value">{{ stats.available }}</div>
+      <div class="stat-label">Доступно</div>
+    </div>
+    <div class="stat-card stat-card--yellow">
+      <div class="stat-value">{{ stats.assigned }}</div>
+      <div class="stat-label">Выдано</div>
+    </div>
+    <div class="stat-card stat-card--pink">
+      <div class="stat-value">{{ stats.users }}</div>
+      <div class="stat-label">Участников</div>
+    </div>
+  </div>
+
+  {% if upload_result %}
+  <div class="alert alert-success" style="margin-bottom:24px;">{{ upload_result }}</div>
+  {% endif %}
+
+  <div class="admin-grid">
+
+    <!-- Загрузка кодов -->
+    <div class="card">
+      <h3 style="margin-bottom:6px;">Добавить промо-коды</h3>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:20px;">
+        Вставьте коды в поле ниже — один код на строку.<br>
+        Дубликаты пропускаются автоматически.
+      </p>
+      <form method="post" action="/admin/upload-codes">
+        <div class="form-group">
+          <label for="codes">Коды</label>
+          <textarea id="codes" name="codes" required
+            placeholder="987651527138080&#10;987652589596192&#10;987652691640275"
+            style="width:100%;height:160px;padding:12px 16px;border:2.5px solid var(--black);border-radius:12px;font-family:'Montserrat',sans-serif;font-size:.88rem;font-weight:600;background:var(--pink-light);resize:vertical;"></textarea>
+        </div>
+        <button type="submit" class="btn btn-secondary">Добавить</button>
+      </form>
+    </div>
+
+    <!-- Выгрузка участников -->
+    <div class="card">
+      <h3 style="margin-bottom:6px;">Выгрузить участников</h3>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:20px;">
+        Скачайте CSV с данными всех участников:<br>
+        телефон, имя, выданный код, дата получения.
+      </p>
+      <a href="/admin/export-users" class="btn btn-primary" style="display:block;">
+        Скачать CSV
+      </a>
+
+      <hr class="divider" style="margin:24px 0;">
+
+      <h3 style="margin-bottom:8px;">Публичный лендинг</h3>
+      <a href="/" target="_blank" class="btn btn-outline" style="display:block;font-size:.9rem;">
+        Открыть сайт →
+      </a>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>

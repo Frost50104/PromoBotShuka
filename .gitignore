@@ -49,3 +49,6 @@ Thumbs.db
 
 # Alembic
 # Keep alembic/versions/ but ignore generated files
+
+
+memory/

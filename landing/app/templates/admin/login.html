@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход — Админ-панель</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body style="background:#f4f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div style="width:100%;max-width:380px;padding:20px;">
+    <div class="card">
+      <div style="text-align:center;margin-bottom:28px;">
+        <img src="/static/images/banner.jpeg" alt="UPPETIT"
+             style="width:100%;border-radius:12px;margin-bottom:16px;">
+        <h2>Панель управления</h2>
+        <p style="color:var(--gray);font-size:.88rem;">Вход для сотрудников UPPETIT</p>
+      </div>
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/admin/login">
+        <div class="form-group">
+          <label for="login">Логин</label>
+          <input type="text" id="login" name="login" placeholder="admin" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="password">Пароль</label>
+          <input type="password" id="password" name="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-secondary">Войти</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Ваш подарок — Идёт Весна{% endblock %}
+
+{% block body %}
+<div class="page">
+  <div class="container">
+
+    <div class="hero-banner" style="max-height:140px;overflow:hidden;">
+      <img src="/static/images/banner.jpeg" alt="Идёт Весна" style="object-position:top;">
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.8rem;margin-bottom:8px;">🎉</div>
+      <span class="badge">Подарок получен!</span>
+      <h2 style="margin:10px 0 8px;">
+        {% if user_name %}{{ user_name }}, поздравляем!{% else %}Поздравляем!{% endif %}
+      </h2>
+      <p style="color:var(--gray);font-size:.9rem;margin-bottom:4px;">
+        Покажи QR-код на кассе UPPETIT<br>и получи бесплатный дрип-пак кофе.
+      </p>
+
+      <!-- QR-код -->
+      <div class="qr-wrapper">
+        <img src="/qr/{{ token }}" alt="QR-код подарка" id="qrImg">
+      </div>
+
+      <p style="font-size:.8rem;color:var(--gray);margin-bottom:20px;">
+        Код: <strong style="letter-spacing:.05em;">{{ code }}</strong>
+      </p>
+
+      <!-- Кнопка скачать -->
+      <a href="/qr-download/{{ token }}" class="btn btn-primary" download="uppetit_qr.png">
+        Сохранить QR-код
+      </a>
+
+      <hr class="divider">
+
+      <div style="background:var(--pink-light);border-radius:14px;padding:16px;text-align:left;">
+        <h3 style="margin-bottom:10px;font-size:1rem;">Как использовать:</h3>
+        <div class="steps" style="margin:0;">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">Сохрани QR-код на телефон</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Приди в любое кафе UPPETIT</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Покажи QR-код кассиру и получи дрип-пак</div>
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size:.78rem;color:var(--gray);margin-top:16px;">
+        Сохрани эту страницу или скачай QR-код —<br>
+        ссылка активна до конца акции.
+      </p>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
